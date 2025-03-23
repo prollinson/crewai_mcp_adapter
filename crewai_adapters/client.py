@@ -126,7 +126,17 @@ class CrewAIAdapterClient:
         if not tool.inputSchema:
             return {}
 
-        schema = tool.inputSchema.model_json_schema()
+        # Handle case where inputSchema is already a dict
+        if isinstance(tool.inputSchema, dict):
+            schema = tool.inputSchema
+        else:
+            # Handle case where inputSchema is a Pydantic model with model_json_schema method
+            try:
+                schema = tool.inputSchema.model_json_schema()
+            except (AttributeError, TypeError):
+                logging.warning(f"Could not convert schema for tool {tool.name}. Using empty schema.")
+                return {}
+
         return {
             "type": "object",
             "properties": schema.get("properties", {}),

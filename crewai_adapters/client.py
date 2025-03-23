@@ -78,16 +78,23 @@ class CrewAIAdapterClient:
             logging.error(f"Connection failed: {str(e)}")
             raise MCPServerConnectionError(f"Failed to connect to {server_name}") from e
     
-    async def connect_to_mcp_server_sse(self, server_name: str, *, url: str) -> None:
+    async def connect_to_mcp_server_sse(
+        self,
+        server_name: str,
+        *,
+        url: str,
+        headers: Optional[Dict[str, str]] = None
+    ) -> None:
         """Connect to an MCP server using SSE.
 
         Args:
             server_name: Unique identifier for the server connection
             url: URL of the MCP server
+            headers: Optional dictionary of headers to include in the SSE connection
         """
         try:
             transport = await self.exit_stack.enter_async_context(
-                sse_client(url)
+                sse_client(url, headers=headers)
             )
             read, write = transport
             session = cast(

@@ -6,6 +6,7 @@ import logging
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.client.sse import sse_client
 from mcp.types import Tool as MCPTool, CallToolResult, TextContent
 from pydantic import BaseModel, create_model, Field
 from crewai.tools import BaseTool
@@ -57,6 +58,36 @@ class CrewAIAdapterClient:
 
             transport = await self.exit_stack.enter_async_context(
                 stdio_client(server_params)
+            )
+            read, write = transport
+            session = cast(
+                ClientSession,
+                await self.exit_stack.enter_async_context(ClientSession(read, write))
+            )
+
+            await session.initialize()
+            self.sessions[server_name] = session
+
+            # Create adapter and load tools
+            adapter = MCPToolsAdapter(AdapterConfig({
+                "tools": await self._get_mcp_tool_configs(session)
+            }))
+            self.tools[server_name] = adapter.get_all_tools()
+
+        except Exception as e:
+            logging.error(f"Connection failed: {str(e)}")
+            raise MCPServerConnectionError(f"Failed to connect to {server_name}") from e
+    
+    async def connect_to_mcp_server_sse(self, server_name: str, *, url: str) -> None:
+        """Connect to an MCP server using SSE.
+
+        Args:
+            server_name: Unique identifier for the server connection
+            url: URL of the MCP server
+        """
+        try:
+            transport = await self.exit_stack.enter_async_context(
+                sse_client(url)
             )
             read, write = transport
             session = cast(
